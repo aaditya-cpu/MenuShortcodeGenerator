@@ -1,0 +1,257 @@
+File structure and contents:
+./admin:
+./admin/css:
+File: ./admin/css/admin-style.css
+Content:
+
+./admin/js:
+File: ./admin/js/admin-scripts.js
+Content:
+
+./admin/partials:
+File: ./admin/partials/admin-page.php
+Content:
+<?php
+echo '<div class="wrap">';
+echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
+echo '<form action="options.php" method="post">';
+
+settings_fields('menu_shortcode');
+do_settings_sections('menu_shortcode');
+submit_button();
+
+echo '</form>';
+echo '</div>';
+
+./includes:
+File: ./includes/class-menu-shortcode.php
+Content:
+<?php
+class Menu_Shortcode {
+
+    public function __construct() {
+        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_init', array($this, 'settings_init'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_shortcode('display_menu', array($this, 'render_menu_by_shortcode'));
+    }
+
+    public function enqueue_scripts() {
+        wp_enqueue_style('menu_shortcode_admin_style', plugin_dir_url(__FILE__) . '../admin/css/admin-style.css');
+        wp_enqueue_script('menu_shortcode_admin_script', plugin_dir_url(__FILE__) . '../admin/js/admin-scripts.js');
+    }
+
+    public function add_admin_menu() {
+        add_menu_page(
+            'Menu Shortcode Generator',
+            'Menu Shortcode',
+            'manage_options',
+            'menu-shortcode-generator',
+            array($this, 'menu_shortcode_admin_page'),
+            'dashicons-menu'
+        );
+    }
+
+    public function menu_shortcode_admin_page() {
+        require_once plugin_dir_path(__FILE__) . '../admin/partials/admin-page.php';
+    }
+
+    public function settings_init() {
+        register_setting('menu_shortcode_options', 'menu_shortcode_options', array($this, 'menu_shortcode_options_validate'));
+
+        add_settings_section(
+            'menu_shortcode_settings',
+            'Shortcode Settings',
+            array($this, 'settings_section_callback'),
+            'menu-shortcode-generator'
+        );
+
+        $this->add_settings_fields();
+    }
+
+    private function add_settings_fields() {
+        add_settings_field('container_class', 'Container Class', array($this, 'menu_shortcode_container_class_render'), 'menu-shortcode-generator', 'menu_shortcode_settings');
+        add_settings_field('container_id', 'Container ID', array($this, 'menu_shortcode_container_id_render'), 'menu-shortcode-generator', 'menu_shortcode_settings');
+        add_settings_field('menu_class', 'Menu Class', array($this, 'menu_shortcode_menu_class_render'), 'menu-shortcode-generator', 'menu_shortcode_settings');
+        add_settings_field('menu_id', 'Menu ID', array($this, 'menu_shortcode_menu_id_render'), 'menu-shortcode-generator', 'menu_shortcode_settings');
+        add_settings_field('echo', 'Echo', array($this, 'menu_shortcode_echo_render'), 'menu-shortcode-generator', 'menu_shortcode_settings');
+    }
+
+    public function render_input_text_field($options, $field) {
+        echo '<input type="text" name="menu_shortcode_options[' . $field . ']" value="' . esc_attr($options[$field] ?? '') . '">';
+    }
+
+    public function render_checkbox_field($options, $field) {
+        $checked = isset($options[$field]) && $options[$field] ? 'checked' : '';
+        echo '<input type="checkbox" name="menu_shortcode_options[' . $field . ']" ' . $checked . '>';
+    }
+
+    public function render_menu_by_shortcode($atts) {
+        $options = shortcode_atts(array(
+            'name' => '',
+            'container' => 'div',
+            'container_class' => '',
+            'container_id' => '',
+            'menu_class' => 'menu',
+            'menu_id' => '',
+            'echo' => false,
+        ), $atts);
+
+        $menu = wp_nav_menu(array(
+            'menu' => $options['name'],
+            'container' => $options['container'],
+            'container_class' => $options['container_class'],
+            'container_id' => $options['container_id'],
+            'menu_class' => $options['menu_class'],
+            'menu_id' => $options['menu_id'],
+            'echo' => $options['echo']
+        ));
+
+        return $menu;
+    }
+
+    public function settings_section_callback() { 
+        echo __('Configure the settings for your menu shortcode.', 'menu-shortcode');
+    }
+
+    public function menu_shortcode_options_validate($input) {
+        $new_input = array();
+        $fields = ['menu_name', 'container', 'container_class', 'container_id', 'menu_class', 'menu_id', 'echo'];
+        foreach ($fields as $field) {
+            $new_input[$field] = isset($input[$field]) ? sanitize_text_field($input[$field]) : '';
+        }
+        $new_input['echo'] = isset($input['echo']) ? (bool)$input['echo'] : false;
+        return $new_input;
+    }
+
+   // Render input for container class
+public function menu_shortcode_container_class_render() {
+    $options = get_option('menu_shortcode_options');
+    $this->render_input_text_field($options, 'container_class');
+}
+
+// Render input for container ID
+public function menu_shortcode_container_id_render() {
+    $options = get_option('menu_shortcode_options');
+    $this->render_input_text_field($options, 'container_id');
+}
+
+// Render input for menu class
+public function menu_shortcode_menu_class_render() {
+    $options = get_option('menu_shortcode_options');
+    $this->render_input_text_field($options, 'menu_class');
+}
+
+// Render input for menu ID
+public function menu_shortcode_menu_id_render() {
+    $options = get_option('menu_shortcode_options');
+    $this->render_input_text_field($options, 'menu_id');
+}
+
+// Render checkbox for echo
+public function menu_shortcode_echo_render() {
+    $options = get_option('menu_shortcode_options');
+    $this->render_checkbox_field($options, 'echo');
+}
+
+// Helper methods to render text fields and checkbox fields
+public function render_input_text_field($options, $field) {
+    echo '<input type="text" name="menu_shortcode_options[' . esc_attr($field) . ']" value="' . esc_attr($options[$field] ?? '') . '" class="widefat">';
+}
+
+public function render_checkbox_field($options, $field) {
+    $checked = isset($options[$field]) && $options[$field] ? 'checked' : '';
+    echo '<input type="checkbox" name="menu_shortcode_options[' . esc_attr($field) . ']" ' . $checked . '>';
+}
+
+File: ./includes/helper-functions.php
+Content:
+
+File: ./index.php
+Content:
+//Silence is Golden
+./languages:
+File: ./languages/menu-shortcode-plugin.pot
+Content:
+
+File: ./menu_shortcode.php
+Content:
+<?php
+/*
+Plugin Name: Menu Shortcode Generator
+Plugin URI: https://github.com/aaditya-cpu/MenuShortcodeGenerator
+Description: Allows for the generation of shortcodes for menus and their display via an admin interface. Users can configure menu properties and embed them using shortcodes.
+Version: 1.0
+Author: Aaditya Uzumaki
+Author URI: https://Goenka.dev
+*/
+
+// Prevent direct access to the script
+defined('ABSPATH') or die('No script kiddies please!');
+
+// Include the core class file
+require_once plugin_dir_path(__FILE__) . 'includes/class-menu-shortcode.php';
+
+/**
+ * Registers hooks that are fired when the plugin is activated or deactivated.
+ * Using static methods of the Menu_Shortcode class for activation and deactivation.
+ */
+register_activation_hook(__FILE__, array('Menu_Shortcode', 'activate'));
+register_deactivation_hook(__FILE__, array('Menu_Shortcode', 'deactivate'));
+
+/**
+ * Starts the plugin by creating an instance of the Menu_Shortcode class and running it.
+ */
+function run_menu_shortcode() {
+    $menu_shortcode = new Menu_Shortcode();
+    $menu_shortcode->run();
+}
+
+// Hook the run function to WordPress 'plugins_loaded' action to ensure all WordPress functions are available to the plugin.
+add_action('plugins_loaded', 'run_menu_shortcode');
+
+File: ./README.md
+Content:
+
+File: ./setup.sh
+Content:
+# #!/bin/bash
+
+# # Create directories
+# mkdir -p admin/css admin/js admin/partials includes languages
+
+# # Create files
+# touch admin/css/admin-style.css admin/js/admin-scripts.js admin/partials/admin-page.php
+# touch includes/class-menu-shortcode.php includes/helper-functions.php
+# touch languages/menu-shortcode-plugin.pot menu-shortcode-plugin.php README.md
+
+#!/bin/bash
+
+# Define the output file
+output_file="tree.out.txt"
+
+# Function to recursively list files and their contents
+list_files() {
+    local file
+    for file in "$1"/*; do
+        if [ -d "$file" ]; then
+            echo "$file:" >> "$output_file"
+            list_files "$file"
+        else
+            echo "File: $file" >> "$output_file"
+            echo "Content:" >> "$output_file"
+            cat "$file" >> "$output_file"
+            echo "" >> "$output_file"
+        fi
+    done
+}
+
+# Start listing files from the current directory
+echo "File structure and contents:" > "$output_file"
+list_files .
+
+echo "File structure and contents saved to $output_file"
+
+File: ./tree.out.txt
+Content:
+
